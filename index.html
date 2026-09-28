@@ -113,7 +113,7 @@
     <div id="envelope-page" class="fixed inset-0 z-50 bg-[#f4ebdf] flex flex-col items-center justify-center transition-opacity duration-1000 overflow-hidden">
         <div id="video-wrapper" class="w-full max-w-md h-full aspect-9-16 relative overflow-hidden cursor-pointer group" onclick="startOpeningSequence()">
             <!-- غلاف المظروف قبل فتح الفيديو -->
-            <img id="envelope-poster" src="./envelope-cover.jpg" alt="غلاف الدعوة" class="absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-300">
+            <img id="envelope-poster" src="./envelope-cover.jpg" alt="غلاف الدعوة" class="absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-500">
             
             <video id="envelope-video" class="w-full h-full object-cover relative z-0" playsinline muted preload="auto">
                 <source src="envelope-opening.mp4#t=0.001" type="video/mp4">
@@ -301,7 +301,7 @@
                 <img src="venue-illustration.png" alt="رسم توضيحي للمكان" class="w-full h-auto object-contain mx-auto">
             </div>
 
-            <div class="min-h-[2.5rem] flex items-center justify-center pt-2">
+            <div class="min-h-[2.5rem] flex items-center justify-center pt-2 reveal-up delay-300">
                 <p id="typing-quote" class="text-xl font-script text-[#5C4D4A] leading-relaxed inline-block"></p>
             </div>
 
@@ -320,6 +320,7 @@
     <script>
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbylWQIXbXWJ2jTveCEiSIkM1lgyCVf5o60HjciTLweYNtcSbHIpHZhS-fS3r9ZaURH5/exec";
         let isOpening = false;
+        let typingTimeout = null;
 
         function startOpeningSequence() {
             if (isOpening) return;
@@ -333,15 +334,29 @@
             const bgMusic = document.getElementById('bg-music');
 
             if (tapHint) tapHint.style.opacity = '0';
-            if (envelopePoster) envelopePoster.style.opacity = '0';
 
             if (bgMusic) {
                 bgMusic.play().catch(error => console.log("الصوت يتطلب تفاعل:", error));
             }
 
-            envelopeVideo.play().catch(error => {
-                console.log("خطأ في تشغيل الفيديو:", error);
-            });
+            envelopeVideo.onplaying = function() {
+                if (envelopePoster) envelopePoster.style.opacity = '0';
+            };
+
+            const playPromise = envelopeVideo.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.log("خطأ في تشغيل الفيديو:", error);
+                    // في حال تعذر التشغيل، الانتقال التلقائي للدعوة
+                    envelopePage.classList.add('opacity-0');
+                    setTimeout(() => {
+                        envelopePage.style.display = 'none';
+                        mainContent.classList.remove('opacity-0');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        initScrollObserver();
+                    }, 500);
+                });
+            }
 
             envelopeVideo.onended = function() {
                 envelopePage.classList.add('opacity-0');
@@ -370,7 +385,7 @@
                 venueLabel: "المكان",
                 venueVal: "بالاتزو فيرساتشي دبي",
                 timeLabel: "الوقت",
-                timeVal: "٧:٠0 مساءً",
+                timeVal: "٧:٠٠ مساءً",
                 locationAddress: "الجداف، واجهة الجداف المائية، دبي",
                 mapBtn: "افتح على الخريطة",
                 countdownTitle: "باقٍ على فرحتنا",
@@ -449,7 +464,7 @@
                 html.setAttribute('dir', 'ltr');
                 html.setAttribute('lang', 'en');
                 langToggleBtn.style.flexDirection = 'row-reverse';
-                langCircle.style.transform = 'translateX(0px)';
+                langCircle.style.transform = 'translateX(2px)';
                 langText.innerText = 'AR';
                 rsvpForm.classList.remove('text-right');
                 rsvpForm.classList.add('text-left');
@@ -517,9 +532,7 @@
             document.querySelector('[data-key="footer-names"]').innerHTML = langData.footerNames;
 
             const quoteEl = document.getElementById('typing-quote');
-            if (quoteEl) {
-                quoteEl.innerText = '';
-                quoteEl.dataset.typed = "false";
+            if (quoteEl && quoteEl.dataset.typed === "true") {
                 startTypingEffect(quoteEl, langData.typingQuoteText);
             }
         }
@@ -562,7 +575,7 @@
             const statusText = statusSelect.options[statusSelect.selectedIndex].text;
 
             submitBtn.disabled = true;
-            submitBtn.innerText = "جاري الإرسال...";
+            submitBtn.innerText = currentLang === 'ar' ? "جاري الإرسال..." : "Sending...";
 
             const payload = {
                 name: nameInput,
@@ -615,6 +628,7 @@
         }
 
         function startTypingEffect(element, text) {
+            if (typingTimeout) clearTimeout(typingTimeout);
             let index = 0;
             element.innerText = '';
             element.classList.add('typing-cursor');
@@ -623,9 +637,9 @@
                 if (index < text.length) {
                     element.innerText += text.charAt(index);
                     index++;
-                    setTimeout(typeNextChar, 100);
+                    typingTimeout = setTimeout(typeNextChar, 80);
                 } else {
-                    setTimeout(() => {
+                    typingTimeout = setTimeout(() => {
                         element.classList.remove('typing-cursor');
                     }, 1000);
                 }
